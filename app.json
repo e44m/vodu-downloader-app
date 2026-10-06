@@ -3,6 +3,7 @@
     "name": "vodu-downloader-app",
     "slug": "vodu-downloader-app",
     "version": "1.0.0",
+    "owner": "e44m",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
