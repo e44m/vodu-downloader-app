@@ -17,11 +17,6 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.mraiko.vodudownloader"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "8af8dd60-a2d3-4e42-99a3-14827db94456"
-      }
     }
   }
 }
