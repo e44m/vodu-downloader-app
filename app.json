@@ -17,11 +17,6 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.anonymous.vodudownloaderapp"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "081f560e212a850491a9e462eeb95d3b7808bc28"
-      }
     }
   }
 }
