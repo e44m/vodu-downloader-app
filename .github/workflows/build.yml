@@ -25,4 +25,4 @@ jobs:
       - name: Build APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: npx eas-cli build --platform android --profile preview --non-interactive --auto-submit-with-default-credentials || npx eas-cli credentials --platform android --non-interactive || npx eas-cli build --platform android --profile preview --non-interactive
+        run: eas build --platform android --profile preview --non-interactive
