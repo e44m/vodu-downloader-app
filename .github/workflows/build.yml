@@ -14,7 +14,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Setup EAS CLI
         run: npm install -g eas-cli
@@ -25,4 +25,4 @@ jobs:
       - name: Build APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: npx eas-cli build --platform android --profile preview --non-interactive --no-wait
+        run: npx eas-cli build --platform android --profile preview --non-interactive --auto-submit-with-default-credentials || npx eas-cli credentials --platform android --non-interactive || npx eas-cli build --platform android --profile preview --non-interactive
