@@ -11,32 +11,18 @@ import {
   Linking,
   Alert,
   ActivityIndicator,
-  ProgressBarAndroid,
-  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
-import * as Notifications from 'expo-notifications';
-
-// إعداد الإشعارات للتنزيل بالخلفية
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+import * as Sharing from 'expo-sharing';
 
 export default function App() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [qualities, setQualities] = useState<{ quality: string; url: string }[]>([]);
   const [episodes, setEpisodes] = useState<{ title: string; url: string }[]>([]);
-  const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // حالة نافذة التليجرام
   const [showTelegramModal, setShowTelegramModal] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
@@ -44,16 +30,8 @@ export default function App() {
 
   useEffect(() => {
     checkTelegramModalPermission();
-    requestPermissions();
   }, []);
 
-  // طلب أذونات الحفظ والإشعارات
-  const requestPermissions = async () => {
-    await MediaLibrary.requestPermissionsAsync();
-    await Notifications.requestPermissionsAsync();
-  };
-
-  // التحقق من خيار عدم إظهار نافذة التليجرام مجدداً
   const checkTelegramModalPermission = async () => {
     try {
       const hideModal = await AsyncStorage.getItem('hide_telegram_modal');
@@ -65,7 +43,6 @@ export default function App() {
     }
   };
 
-  // إغلاق نافذة التليجرام وتطبيق خيار الحفظ
   const handleCloseTelegramModal = async () => {
     if (dontShowAgain) {
       await AsyncStorage.setItem('hide_telegram_modal', 'true');
@@ -73,13 +50,11 @@ export default function App() {
     setShowTelegramModal(false);
   };
 
-  // فتح قناة التليجرام
   const handleOpenTelegram = () => {
     Linking.openURL(TELEGRAM_CHANNEL_URL);
     handleCloseTelegramModal();
   };
 
-  // معالجة الرابط واستخراج الحلقات أو الجودات
   const handleFetchMedia = async () => {
     if (!url.trim()) {
       Alert.alert('تنبيه', 'يرجى إدخال رابط الفيديو أو المسلسل أولاً');
@@ -94,17 +69,15 @@ export default function App() {
       const response = await fetch(url);
       const htmlText = await response.text();
 
-      // محاكاة استخراج قائمة الحلقات إذا كان الرابط يحتوي على مسلسل
       const episodeMatches = Array.from(htmlText.matchAll(/href="([^"]*episode-[^"]*)"/g));
       if (episodeMatches.length > 0) {
-        const extractedEpisodes = episodeMatches.slice(0, 20).map((match, index) => ({
+        const extractedEpisodes = episodeMatches.slice(0, 15).map((match, index) => ({
           title: `الحلقة ${index + 1}`,
           url: match[1].startsWith('http') ? match[1] : `${url}${match[1]}`,
         }));
         setEpisodes(extractedEpisodes);
       }
 
-      // استخراج الجودات المتاحة (1080p, 720p, 360p...)
       const qualityMatches = Array.from(htmlText.matchAll(/href="([^"]*\.(mp4|m3u8)[^"]*)"/g));
       if (qualityMatches.length > 0) {
         const extractedQualities = [
@@ -114,65 +87,30 @@ export default function App() {
         ];
         setQualities(extractedQualities);
       } else {
-        // جودة افتراضية
-        setQualities([{ quality: 'الجودة الأساسية (المتاحة)', url: url }]);
+        setQualities([{ quality: 'الجودة الأساسية المتاحة', url: url }]);
       }
     } catch (error) {
-      Alert.alert('خطأ', 'فشل جلب تفاصيل الرابط، يرجى التأكد من صحة الرابط');
+      Alert.alert('خطأ', 'تعذر معالجة الرابط، يرجى التأكد من صحة الرابط');
     } finally {
       setLoading(false);
     }
   };
 
-  // بدء التنزيل المباشر في المجلد العام وإظهار الإشعار
   const startDownload = async (downloadUrl: string, label: string) => {
     try {
       setIsDownloading(true);
-      setDownloadProgress(0);
-
       const fileName = `Vodu_Video_${Date.now()}.mp4`;
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
 
-      const downloadResumable = FileSystem.createDownloadResumable(
-        downloadUrl,
-        fileUri,
-        {},
-        (downloadProgressData) => {
-          const progress =
-            downloadProgressData.totalBytesWritten /
-            downloadProgressData.totalBytesExpectedToWrite;
-          setDownloadProgress(progress);
+      const { uri } = await FileSystem.downloadAsync(downloadUrl, fileUri);
 
-          // تحديث الإشعار بالتقدم
-          Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'جاري التنزيل...',
-              body: `نسبة الأكتمال: ${Math.round(progress * 100)}%`,
-            },
-            trigger: null,
-          });
-        }
-      );
-
-      const result = await downloadResumable.downloadAsync();
-
-      if (result?.uri) {
-        // حفظ الملف مباشرة بمعرض الهاتف / التنزيلات العامة
-        const asset = await MediaLibrary.createAssetAsync(result.uri);
-        await MediaLibrary.createAlbumAsync('Vodu Downloads', asset, false);
-
-        Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'اكتمل التنزيل بنجاح! 🎉',
-            body: 'تم حفظ الفيديو داخل مجلد التنزيلات والمعرض على جهازك.',
-          },
-          trigger: null,
-        });
-
-        Alert.alert('نجاح', 'تم تنزيل الفيديو وحفظه مباشرة في جهازك!');
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri);
+      } else {
+        Alert.alert('نجاح', 'تم تنزيل الفيديو بنجاح!');
       }
     } catch (error) {
-      Alert.alert('خطأ التنزيل', 'حدث خطأ أثناء تنزيل الملف بالخلفية');
+      Alert.alert('خطأ', 'حدث خطأ أثناء تنزيل الملف');
     } finally {
       setIsDownloading(false);
     }
@@ -183,7 +121,6 @@ export default function App() {
       <Text style={styles.headerTitle}>Vodu Video Downloader</Text>
       <Text style={styles.subHeader}>تطوير: MrAiko1</Text>
 
-      {/* حقل الرابط */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -198,19 +135,9 @@ export default function App() {
       </View>
 
       {loading && <ActivityIndicator size="large" color="#a855f7" style={{ marginVertical: 20 }} />}
-
-      {/* شريط تقدم التنزيل */}
-      {isDownloading && (
-        <View style={styles.progressContainer}>
-          <Text style={styles.progressText}>جاري التنزيل: {Math.round(downloadProgress * 100)}%</Text>
-          {Platform.OS === 'android' && (
-            <ProgressBarAndroid styleAttr="Horizontal" indeterminate={false} progress={downloadProgress} color="#a855f7" />
-          )}
-        </View>
-      )}
+      {isDownloading && <Text style={styles.downloadingText}>⏳ جاري تنزيل الملف، يرجى الانتظار...</Text>}
 
       <ScrollView style={styles.scrollArea}>
-        {/* قائمة الحلقات إن وجدت */}
         {episodes.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>الحلقات المتاحة:</Text>
@@ -230,7 +157,6 @@ export default function App() {
           </View>
         )}
 
-        {/* قائمة الجودات المتاحة */}
         {qualities.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>اختر الجودة للتنزيل:</Text>
@@ -246,12 +172,10 @@ export default function App() {
         )}
       </ScrollView>
 
-      {/* زر الوصول المباشر لقناة التليجرام */}
       <TouchableOpacity style={styles.telegramBanner} onPress={handleOpenTelegram}>
         <Text style={styles.telegramBannerText}>📢 انضم لقناتنا على التليجرام: @MrAiko1</Text>
       </TouchableOpacity>
 
-      {/* نافذة التليجرام الترويجية (Pop-up Modal) */}
       <Modal visible={showTelegramModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -292,8 +216,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, backgroundColor: '#1e293b', borderRadius: 8, paddingHorizontal: 12, color: '#fff', height: 48 },
   fetchButton: { backgroundColor: '#a855f7', borderRadius: 8, justifyContent: 'center', paddingHorizontal: 16 },
   buttonText: { color: '#fff', fontWeight: 'bold' },
-  progressContainer: { padding: 12, backgroundColor: '#1e293b', borderRadius: 8, marginBottom: 15 },
-  progressText: { color: '#fff', marginBottom: 8, textAlign: 'center' },
+  downloadingText: { color: '#38bdf8', textAlign: 'center', marginBottom: 15, fontWeight: 'bold' },
   scrollArea: { flex: 1 },
   section: { marginBottom: 20 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#38bdf8', marginBottom: 10 },
@@ -305,7 +228,6 @@ const styles = StyleSheet.create({
   telegramBanner: { backgroundColor: '#0284c7', padding: 12, borderRadius: 8, marginBottom: 20, alignItems: 'center' },
   telegramBannerText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
 
-  // تنسيقات النافذة الترحيبية (Modal)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center' },
   modalCard: { width: '85%', backgroundColor: '#1e1b4b', borderRadius: 16, padding: 20, alignItems: 'center', borderWidth: 1, borderColor: '#a855f7' },
   modalHeader: { backgroundColor: '#9333ea', width: '100%', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 15 },
