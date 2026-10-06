@@ -6,15 +6,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/checkout@v4
         with:
-          node-version: 20
+          node-version: 18
 
       - name: Setup EAS CLI
         run: npm install -g eas-cli
@@ -25,4 +24,4 @@ jobs:
       - name: Build APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform android --profile preview --non-interactive
+        run: npx eas-cli build --platform android --profile preview --non-interactive --auto-submit=false
