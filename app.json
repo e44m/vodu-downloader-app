@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "vodu-downloader-app",
+    "name": "مُحمل الحلقات والترجمة",
     "slug": "vodu-downloader-app",
+    "owner": "e44m",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,11 +24,6 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "auto"
-      }
     }
   }
 }
